@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>cp28 场馆地图</title>
+    <script src="./three/pixi/pixi.js"></script>
+    <script src="./three/pathfinding/pathfinding-browser.js"></script>
+    <style>
+        body,
+        div {
+            padding: 0px;
+            margin: 0px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <button onclick="getField()">生成地图</button>
+
+    <script>
+        const app = new PIXI.Application();
+
+        const loader = PIXI.Loader.shared;
+        const Sprite = PIXI.Sprite
+        // const renderer = new PIXI.SystemRenderer;
+        const lightAlpha = 0.3;
+        const drakAlpha = 0.5;
+        var btnMap = {};
+
+        function initPixi() {
+
+            let type = "WebGL";
+            if (!PIXI.utils.isWebGLSupported()) {
+                type = "canvas";
+            }
+            PIXI.utils.sayHello(type);
+
+            document.body.appendChild(app.view);
+            app.renderer.backgroundColor = 0xFFFFFF;
+            app.renderer.autoResize = true;
+            app.renderer.view.style.position = "absolute";
+            app.renderer.view.style.display = "block";
+            app.renderer.resize(window.innerWidth, window.innerHeight);
+        }
+
+        function addSprite() {
+            loader.add("cat", "images/cat.png")
+                .load(setup);
+        }
+
+        function setup(loader, resources) {
+            for (resource in resources) {
+                let sprite = new Sprite(loader.resources[resource].texture);
+                app.stage.addChild(sprite)
+            }
+
+        }
+
+        function drawGrid() {
+            let x = 0,
+                y = 0;
+            const GRID_SIZE = 200;
+            while (y < window.innerWidth || x < window.innerHeight) {
+                var rectangle = new PIXI.Graphics();
+                const position = `${x/GRID_SIZE},${y/GRID_SIZE}`;
+                rectangle.lineStyle(1, 0xffffff, 1);
+                rectangle.beginFill(0x000000)
+                rectangle.drawRect(x, y, GRID_SIZE, GRID_SIZE);
+                rectangle.endFill();
+
+                // rectangle.interactive = true;
+
+                // rectangle.on("pointerdown", setRed)
+                const texture = app.renderer.generateTexture(rectangle);
+                const sprite = Sprite.from(texture)
+                sprite.alpha = lightAlpha;
+                sprite.interactive = true;
+                sprite.x = x;
+                sprite.y = y;
+                sprite.on("pointerover", setRed)
+                    .on("pointerdown", setRed);
+                app.stage.addChild(sprite);
+
+                console.log(x / GRID_SIZE, y / GRID_SIZE)
+                x += GRID_SIZE;
+                btnMap[position] = sprite;
+                if (x >= window.innerWidth) {
+
+                    x = 0;
+                    y += GRID_SIZE;
+                }
+            }
+
+        }
+
+        function setRed(e) {
+            const isPressure = e.data.originalEvent.pressure > 0
+            if (isPressure) {
+                this.alpha = this.alpha === drakAlpha ? lightAlpha : drakAlpha;
+            }
+        }
+
+        function getField() {
+            var fieldList = [];
+            for (btn in btnMap) {
+                if (btnMap[btn].alpha === drakAlpha) {
+                    fieldList.push(btn);
+                }
+            }
+            console.log("fieldList", fieldList);
+        }
+
+        initPixi();
+        // addSprite();
+        drawGrid();
+
+
+
+        var grid = new PF.Grid(5, 7);
+
+        var finder = new PF.AStarFinder();
+
+        var path = finder.findPath(0, 0, 4, 6, grid);
+        console.log(path);
+    </script>
+</body>
+
+</html>
