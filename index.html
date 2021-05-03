@@ -8,28 +8,74 @@
     <title>cp28 场馆地图</title>
     <script src="./three/pixi/pixi.js"></script>
     <script src="./three/pathfinding/pathfinding-browser.js"></script>
+    <script src="https://unpkg.com/zepto"></script>
     <style>
         body,
         div {
             padding: 0px;
             margin: 0px;
         }
+
+        body {
+            height: 100vh;
+            background: url("/images/map.png")
+        }
+
+        canvas {
+            opacity: 0.6;
+        }
+
+        .ui {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 99999999;
+        }
     </style>
 </head>
 
 <body>
 
-    <button onclick="getField()">生成地图</button>
+    <div class="ui">
+
+        <button onclick="getField()">生成地图</button>
+
+        <button onclick="genPath()">生成路径</button>
+
+        <button id="mode-btn"></button>
+    </div>
 
     <script>
+        const MODE_TYPE = ["观看", "编辑"]
+
+        const GRID_SIZE = 20;
         const app = new PIXI.Application();
 
+        const maxWidth = 2500;
+        const maxHeight = 2200;
         const loader = PIXI.Loader.shared;
         const Sprite = PIXI.Sprite
+
+        const realPath = new PIXI.Graphics();
         // const renderer = new PIXI.SystemRenderer;
         const lightAlpha = 0.3;
-        const drakAlpha = 0.5;
-        var btnMap = {};
+        const drakAlpha = 0.8;
+        const checkedAlpha = 0.1;
+        let btnMap = {};
+        let btnArray = [];
+        let mode = 0;
+
+        $(function () {
+            updateMode(mode);
+            $("#mode-btn").on("click", () => {
+                updateMode(mode ? 0 : 1)
+            })
+        })
+
+        function updateMode(newMode) {
+            mode = newMode;
+            $("#mode-btn").text(`${MODE_TYPE[mode]}模式`);
+        }
 
         function initPixi() {
 
@@ -44,37 +90,73 @@
             app.renderer.autoResize = true;
             app.renderer.view.style.position = "absolute";
             app.renderer.view.style.display = "block";
-            app.renderer.resize(window.innerWidth, window.innerHeight);
+            app.renderer.resize(maxWidth, maxHeight);
         }
 
-        function addSprite() {
-            loader.add("cat", "images/cat.png")
-                .load(setup);
+        function drawNum() {
+            let drawList = ["A.png", "B.png", "C.png"]
+            let [A, B] = drawList.map((text, i) => {
+                let type = text.replace(".png", "");
+                let draw = Sprite.from(`images/${text}`);
+                app.stage.addChild(draw);
+                draw.y = 50;
+                draw.x = ((i + 1) * 25);
+                draw.scale.set(0.25);
+                draw.anchor.set(0.5);
+                draw.buttonMode = true;
+                draw.interactive = true;
+                draw.dragging = false;
+                draw.ctype = type;
+                draw.on('mousedown', onDragStart)
+                    .on("mousemove", onDragMove)
+                    .on("mouseup", onDragEnd);
+                return draw;
+            })
         }
 
-        function setup(loader, resources) {
-            for (resource in resources) {
-                let sprite = new Sprite(loader.resources[resource].texture);
-                app.stage.addChild(sprite)
+        let selectedTarget;
+        let APosition = {};
+
+        function onDragStart(e) {
+
+            if (!this.dragging && APosition[this.ctype]) {
+                btnMap[APosition[this.ctype]].mode = "";
+                btnMap[APosition[this.ctype]].alpha = lightAlpha;
             }
+            this.x = e.data.global.x;
+            this.y = e.data.global.y;
+            this.dragging = true;
 
+        }
+
+        function onDragMove(e) {
+            if (!this.dragging) {
+                return
+            }
+            this.x = e.data.global.x;
+            this.y = e.data.global.y;
+            APosition[this.ctype] = `${Math.round(this.x/GRID_SIZE)},${Math.round(this.y/GRID_SIZE)}`;
+        }
+
+        function onDragEnd(e) {
+            this.x = e.data.global.x;
+            this.y = e.data.global.y;
+            this.dragging = false;
+            btnMap[APosition[this.ctype]].mode = "A";
+            btnMap[APosition[this.ctype]].alpha = drakAlpha;
         }
 
         function drawGrid() {
             let x = 0,
                 y = 0;
-            const GRID_SIZE = 200;
-            while (y < window.innerWidth || x < window.innerHeight) {
+            console.time("render")
+            while (y < maxWidth || x < maxHeight) {
                 var rectangle = new PIXI.Graphics();
                 const position = `${x/GRID_SIZE},${y/GRID_SIZE}`;
                 rectangle.lineStyle(1, 0xffffff, 1);
                 rectangle.beginFill(0x000000)
                 rectangle.drawRect(x, y, GRID_SIZE, GRID_SIZE);
                 rectangle.endFill();
-
-                // rectangle.interactive = true;
-
-                // rectangle.on("pointerdown", setRed)
                 const texture = app.renderer.generateTexture(rectangle);
                 const sprite = Sprite.from(texture)
                 sprite.alpha = lightAlpha;
@@ -85,47 +167,105 @@
                     .on("pointerdown", setRed);
                 app.stage.addChild(sprite);
 
-                console.log(x / GRID_SIZE, y / GRID_SIZE)
+                if (btnArray[y / GRID_SIZE] == void 0) {
+                    btnArray[y / GRID_SIZE] = [];
+                }
+                btnArray[y / GRID_SIZE][x / GRID_SIZE] = sprite;
                 x += GRID_SIZE;
                 btnMap[position] = sprite;
-                if (x >= window.innerWidth) {
+                if (x >= maxWidth) {
 
                     x = 0;
                     y += GRID_SIZE;
                 }
             }
+            console.timeEnd("render")
 
         }
 
         function setRed(e) {
             const isPressure = e.data.originalEvent.pressure > 0
-            if (isPressure) {
-                this.alpha = this.alpha === drakAlpha ? lightAlpha : drakAlpha;
+            if (!isPressure || mode !== 1) {
+                return
             }
+            if (this.mode) {
+                this.alpha = lightAlpha;
+                this.mode = "";
+                return;
+            }
+
+            this.mode = "WALL";
+            this.alpha = drakAlpha;
         }
 
+        let twoPoint = [];
+
         function getField() {
-            var fieldList = [];
+            console.time("genField")
+            let fieldList = [];
+            let list = [];
+            twoPoint = [];
             for (btn in btnMap) {
-                if (btnMap[btn].alpha === drakAlpha) {
+                if (btnMap[btn].mode === "WALL") {
                     fieldList.push(btn);
                 }
+                if (btnMap[btn].mode === "A") {
+                    twoPoint.push(btn.split(","))
+                }
             }
+            console.log(twoPoint)
             console.log("fieldList", fieldList);
+            walkabilityMatrix = btnArray.map(btnList =>
+                btnList.map((btn) => {
+                    // if (!btn.mode) {
+                    //     return 0;
+                    // }
+                    if (btn.mode === "WALL") {
+                        return 1
+                    }
+                    return 0;
+                    // if (btn.mode === "A") {
+                    //     return 2;
+                    // }
+
+                    // if (btn.mode === "B") {
+                    //     return 3;
+                    // }
+                })
+            )
+            // console.log("btnArray", a);
+
+            console.timeEnd("genField")
+        }
+        var walkabilityMatrix = []
+
+        function genPath() {
+            while (app.stage.children[0]) {
+                app.stage.removeChild(app.stage.children[0]);
+            }
+            console.time("path")
+            var grid = new PF.Grid(walkabilityMatrix);
+
+            var finder = new PF.AStarFinder({
+                allowDiagonal: true
+            });
+            var path = finder.findPath(twoPoint[0][0], twoPoint[0][1], twoPoint[1][0], twoPoint[1][1], grid);
+            console.log(path);
+            console.timeEnd("path")
+            realPath.clear();
+            realPath.lineStyle(5, 0xc02c38, 1);
+            realPath.moveTo(path[0][0] * GRID_SIZE + GRID_SIZE / 2, path[0][1] * GRID_SIZE + GRID_SIZE / 2);
+            path.map((p) => {
+
+                realPath.lineTo(p[0] * GRID_SIZE + GRID_SIZE / 2, p[1] * GRID_SIZE + GRID_SIZE / 2);
+            })
+            app.stage.addChild(realPath);
         }
 
         initPixi();
         // addSprite();
         drawGrid();
-
-
-
-        var grid = new PF.Grid(5, 7);
-
-        var finder = new PF.AStarFinder();
-
-        var path = finder.findPath(0, 0, 4, 6, grid);
-        console.log(path);
+        drawNum();
     </script>
 </body>
 
