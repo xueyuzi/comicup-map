@@ -12,3 +12,8 @@ todo:
 - [ ] 可通过选择几号馆，几号门来定位起点A点
 - [ ] 可通关选择几号馆，摊位分区，来定位目的地B点
 - [ ] 编辑时可自动保存，即使推出下次进来可以自动读取上次记录
+
+
+## 演示
+
+<img src="https://raw.githubusercontent.com/xueyuzi/comicup-map/master/demo/_V7434G%24%25%25%5D%5D%24Q%24(527%24L%40J.png" />
