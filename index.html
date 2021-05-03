@@ -165,6 +165,11 @@
                 sprite.y = y;
                 sprite.on("pointerover", setRed)
                     .on("pointerdown", setRed);
+
+                if (walkabilityMatrix.length > 0 && walkabilityMatrix[y / GRID_SIZE][x / GRID_SIZE] > 0) {
+                    sprite.mode = "WALL";
+                    sprite.alpha = drakAlpha;
+                }
                 app.stage.addChild(sprite);
 
                 if (btnArray[y / GRID_SIZE] == void 0) {
@@ -199,6 +204,8 @@
         }
 
         let twoPoint = [];
+
+        var walkabilityMatrix = localStorage.getItem("map") ? JSON.parse(localStorage.getItem("map")) : [];
 
         function getField() {
             console.time("genField")
@@ -236,8 +243,9 @@
             // console.log("btnArray", a);
 
             console.timeEnd("genField")
+
+            localStorage.setItem("map", JSON.stringify(walkabilityMatrix))
         }
-        var walkabilityMatrix = []
 
         function genPath() {
             while (app.stage.children[0]) {
